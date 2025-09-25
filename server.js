@@ -30,8 +30,8 @@ app.use(cors({ origin: FRONTEND_ORIGIN }));
 app.use('/uploads', express.static(UPLOAD_DIR));
 
 // Aspose credentials from env
-const CLIENT_ID = process.env.ASPOSE_CLIENT_ID;
-const CLIENT_SECRET = process.env.ASPOSE_CLIENT_SECRET;
+const CLIENT_ID = process.env.883f5752-fb59-4a30-a590-191535c65fa6;
+const CLIENT_SECRET = process.env.2768a80b78e54a01209e629707f91ca7;
 if (!CLIENT_ID || !CLIENT_SECRET) {
   console.warn('Warning: ASPOSE_CLIENT_ID or ASPOSE_CLIENT_SECRET not set in env vars.');
 }
