@@ -1,53 +1,68 @@
 // server.js
 import express from "express";
-import multer from "multer";
 import path from "path";
-import fs from "fs";
-import fetch from "node-fetch"; // if using Node 20+, native fetch works
 import { fileURLToPath } from "url";
+import multer from "multer";
+import fs from "fs";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Fix for __dirname in ES modules
+// Fix __dirname for ES module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Set up uploads folder
-const upload = multer({ dest: path.join(__dirname, "uploads/") });
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static uploads
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Aspose credentials
-const ASPOSE_CLIENT_ID = "883f5752-fb59-4a30-a590-191535c65fa6";
-const ASPOSE_CLIENT_SECRET = "2768a80b78e54a01209e629707f91ca7";
+// Multer setup for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => cb(null, file.originalname),
+});
+const upload = multer({ storage });
 
-// Route to convert 3D file
+// Home route
+app.get("/", (req, res) => {
+  res.send("3D File Viewer & Converter API is running!");
+});
+
+// Upload and convert 3D file route
 app.post("/convert", upload.single("file"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).send("No file uploaded.");
+    const file = req.file;
 
-    const inputFilePath = req.file.path;
-    const outputFileName = req.file.originalname.split(".")[0] + ".glb";
+    if (!file) return res.status(400).json({ error: "No file uploaded" });
 
-    // Get Aspose OAuth token
+    // Get Aspose access token
     const tokenResponse = await fetch("https://api.aspose.cloud/connect/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         grant_type: "client_credentials",
-        client_id: ASPOSE_CLIENT_ID,
-        client_secret: ASPOSE_CLIENT_SECRET,
+        client_id: process.env.ASPOSE_CLIENT_ID,
+        client_secret: process.env.ASPOSE_CLIENT_SECRET,
       }),
     });
+
+    if (!tokenResponse.ok) {
+      const errText = await tokenResponse.text();
+      throw new Error(`Token request failed: ${errText}`);
+    }
 
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;
 
-    // Upload and convert using Aspose API
-    const fileBuffer = fs.readFileSync(inputFilePath);
+    // Read file as buffer
+    const fileBuffer = fs.readFileSync(file.path);
 
+    // Send file to Aspose 3D conversion API
     const convertResponse = await fetch(
-      "https://api.aspose.cloud/v3.0/3d/convert/fbx/glb",
+      "https://api.aspose.cloud/v3/3d/convert/fbx/glb",
       {
         method: "PUT",
         headers: {
@@ -59,25 +74,26 @@ app.post("/convert", upload.single("file"), async (req, res) => {
     );
 
     if (!convertResponse.ok) {
-      const err = await convertResponse.json();
-      return res.status(500).json(err);
+      const errText = await convertResponse.text();
+      throw new Error(`Conversion failed: ${errText}`);
     }
 
-    const convertedBuffer = await convertResponse.arrayBuffer();
-    const outputPath = path.join(__dirname, "uploads", outputFileName);
+    const outputBuffer = Buffer.from(await convertResponse.arrayBuffer());
 
-    fs.writeFileSync(outputPath, Buffer.from(convertedBuffer));
+    // Save converted file
+    const outputFilePath = path.join(__dirname, "uploads", `${file.filename}.glb`);
+    fs.writeFileSync(outputFilePath, outputBuffer);
 
     res.json({
+      success: true,
       message: "File converted successfully",
-      fileUrl: `/uploads/${outputFileName}`,
+      convertedFile: `/uploads/${file.filename}.glb`,
     });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("Conversion failed.");
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+// Start server
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
