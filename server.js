@@ -23,8 +23,8 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // CORS: restrict in production to your site only
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || '*';
-app.use(cors({ origin: FRONTEND_ORIGIN }));
+const https://dextrous.infinityfreeapp.com/free-3d-model-viewer-glb-gltf-obj-fbx/?i=1 = process.env.https://dextrous.infinityfreeapp.com/free-3d-model-viewer-glb-gltf-obj-fbx/?i=1 || '*';
+app.use(cors({ origin: https://dextrous.infinityfreeapp.com/free-3d-model-viewer-glb-gltf-obj-fbx/?i=1 }));
 
 // serve converted files
 app.use('/uploads', express.static(UPLOAD_DIR));
@@ -41,8 +41,8 @@ async function getAsposeToken() {
   const url = 'https://api.aspose.cloud/connect/token';
   const params = new URLSearchParams({
     grant_type: 'client_credentials',
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET
+    client_id: 883f5752-fb59-4a30-a590-191535c65fa6,
+    client_secret: 2768a80b78e54a01209e629707f91ca7
   });
 
   const resp = await axios.post(url, params.toString(), {
