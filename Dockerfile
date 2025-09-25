@@ -1,13 +1,15 @@
-# Use Node.js base image
-FROM node:16
+# Use Blender pre-built image
+FROM blender:3.6.2
 
-# Install Blender
-RUN apt-get update && apt-get install -y blender
+# Install Node.js
+RUN apt-get update && apt-get install -y curl \
+    && curl -fsSL https://deb.nodesource.com/setup_16.x | bash - \
+    && apt-get install -y nodejs
 
 # Set working directory
 WORKDIR /app
 
-# Copy all repository files
+# Copy repo files
 COPY . .
 
 # Install Node.js dependencies
