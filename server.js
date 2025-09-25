@@ -20,7 +20,7 @@ app.post('/convert', upload.single('file'), (req, res) => {
       return res.status(500).send('Conversion failed');
     }
 
-    // Send GLB file back to client
+    // Send GLB file back
     res.download(outputPath, req.file.originalname.split('.')[0] + '.glb', (err) => {
       fs.unlinkSync(inputPath);
       fs.unlinkSync(outputPath);
