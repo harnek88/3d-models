@@ -1,112 +1,83 @@
-// server.js - Node.js/Express backend for secure Aspose 3D conversion
-require('dotenv').config();
-const express = require('express');
-const multer = require('multer');
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
-const cors = require('cors');
+// backend/index.js
+import express from "express";
+import multer from "multer";
+import axios from "axios";
+import fs from "fs";
+import path from "path";
 
 const app = express();
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
+const upload = multer({ dest: "uploads/" });
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const safeName = Date.now() + '-' + file.originalname.replace(/\s+/g, '_');
-    cb(null, safeName);
-  }
-});
-const upload = multer({ storage });
+const ASPOSE_CLIENT_ID = process.env.ASPOSE_CLIENT_ID;
+const ASPOSE_CLIENT_SECRET = process.env.ASPOSE_CLIENT_SECRET;
 
-// CORS: allow your frontend
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || '*';
-app.use(cors({ origin: FRONTEND_ORIGIN }));
-
-// Serve uploaded/converted files
-app.use('/uploads', express.static(UPLOAD_DIR));
-
-// Aspose credentials
-const CLIENT_ID = process.env.ASPOSE_CLIENT_ID || '883f5752-fb59-4a30-a590-191535c65fa6';
-const CLIENT_SECRET = process.env.ASPOSE_CLIENT_SECRET || '2768a80b78e54a01209e629707f91ca7';
-
-// Function: Get Aspose access token
+// Function to get Bearer token from Aspose
 async function getAsposeToken() {
   try {
-    const params = new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET
-    });
-    const resp = await axios.post('https://api.aspose.cloud/connect/token', params.toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      timeout: 15000
-    });
+    const resp = await axios.post(
+      "https://api.aspose.cloud/connect/token",
+      new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: ASPOSE_CLIENT_ID,
+        client_secret: ASPOSE_CLIENT_SECRET,
+        scope: "3d.readwrite"
+      }),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        }
+      }
+    );
     return resp.data.access_token;
   } catch (err) {
-    console.error('Error getting Aspose token:', err.response ? err.response.data : err.message);
-    throw new Error('Failed to get Aspose token');
+    console.error("Error getting token:", err.response?.data || err.message);
+    throw err;
   }
 }
 
-// POST /convert - handle 3D file upload and conversion
-app.post('/convert', upload.single('file'), async (req, res) => {
+// Convert endpoint
+app.post("/convert", upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, error: "No file uploaded" });
+
+  const filePath = req.file.path;
+  const fromExt = path.extname(req.file.originalname).substring(1).toLowerCase();
+  const toExt = "glb"; // Change target format if needed
+
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded (use field name "file")' });
-
-    const uploadedPath = req.file.path;
-    const ext = path.extname(req.file.originalname).replace('.', '').toLowerCase();
-
-    // If already GLB/GLTF, return directly
-    if (ext === 'glb' || ext === 'gltf') {
-      return res.json({ success: true, converted: false, url: `/uploads/${path.basename(uploadedPath)}` });
-    }
-
-    // Get Aspose token
     const token = await getAsposeToken();
 
-    // Call Aspose convert endpoint
-    const convertUrl = `https://api.aspose.cloud/v3/3d/convert/${encodeURIComponent(ext)}/glb`;
-    const asposeResp = await axios.put(convertUrl, fs.createReadStream(uploadedPath), {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/octet-stream'
-      },
-      responseType: 'stream',
-      maxBodyLength: Infinity,
-      maxContentLength: Infinity,
-      timeout: 120000
-    });
+    const fileBuffer = fs.readFileSync(filePath);
 
-    // Save converted file
-    const outFilename = `${path.basename(uploadedPath, path.extname(uploadedPath))}.glb`;
-    const outPath = path.join(UPLOAD_DIR, outFilename);
-    const writer = fs.createWriteStream(outPath);
+    const response = await axios.post(
+      `https://api.aspose.cloud/v3.0/3d/convert/${fromExt}/${toExt}`,
+      fileBuffer,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/octet-stream",
+          Accept: "application/json"
+        },
+        responseType: "arraybuffer" // get raw file back
+      }
+    );
 
-    await new Promise((resolve, reject) => {
-      asposeResp.data.pipe(writer);
-      asposeResp.data.on('end', resolve);
-      asposeResp.data.on('error', reject);
-      writer.on('error', reject);
-    });
+    const outFileName = `${req.file.filename}.${toExt}`;
+    const outPath = path.join("uploads", outFileName);
+    fs.writeFileSync(outPath, response.data);
 
-    // Optional: remove original upload to save space
-    fs.unlink(uploadedPath, () => {});
-
-    // Return URL
-    const publicUrl = `/uploads/${outFilename}`;
-    res.json({ success: true, converted: true, url: publicUrl });
+    // Send back URL to frontend
+    res.json({ success: true, url: `/uploads/${outFileName}` });
   } catch (err) {
-    console.error('Conversion error:', err.response ? err.response.data : err.message);
-    res.status(500).json({ success: false, error: 'Conversion failed', details: err.message });
+    console.error("Conversion error:", err.response?.data || err.message);
+    res.status(500).json({ success: false, error: err.response?.data || err.message });
+  } finally {
+    // Clean up uploaded file
+    fs.unlinkSync(filePath);
   }
 });
 
-// Health check
-app.get('/health', (_, res) => res.json({ ok: true }));
+// Serve converted files
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
