@@ -1,11 +1,10 @@
-# Use linuxserver Blender image
+# Base Blender image
 FROM linuxserver/blender:4.5.3-ls186
 
-# Install Node.js 16.x and update npm
+# Install Node.js 20.x (includes npm compatible with latest packages)
 RUN apt-get update && apt-get install -y curl \
-    && curl -fsSL https://deb.nodesource.com/setup_16.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g npm@11.6.1
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
 
 # Set working directory
 WORKDIR /app
