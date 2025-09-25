@@ -1,5 +1,5 @@
-# Use official Blender image
-FROM blender/blender:3.6.2
+# Use linuxserver's Blender image
+FROM linuxserver/blender:4.5.3-ls186
 
 # Install Node.js
 RUN apt-get update && apt-get install -y curl \
