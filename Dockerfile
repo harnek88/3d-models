@@ -1,23 +1,20 @@
-# Use official Node 20 LTS image
-FROM node:20-alpine
+# Use official Node.js 20 image
+FROM node:20
 
 # Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json
+# Copy package.json and package-lock.json first (for caching)
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install --production
+RUN npm install
 
-# Copy the rest of the app
+# Copy all app files
 COPY . .
 
-# Expose the port your app will run on
+# Expose port (Render sets PORT via env variable)
 EXPOSE 3000
 
-# Set environment variables (optional default values, override in Render dashboard)
-ENV NODE_ENV=production
-
 # Start the app
-CMD ["node", "server.js"]
+CMD ["npm", "start"]
