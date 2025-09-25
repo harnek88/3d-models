@@ -1,22 +1,20 @@
-# Base Blender image
-FROM linuxserver/blender:4.5.3-ls186
-
-# Install Node.js 20.x
-RUN apt-get update && apt-get install -y curl \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs
+# Use latest LTS Node.js version
+FROM node:20
 
 # Set working directory
 WORKDIR /app
 
-# Copy backend files
-COPY . .
+# Copy package.json and package-lock.json first (for caching)
+COPY package*.json ./
 
 # Install Node.js dependencies
 RUN npm install
 
-# Expose port
+# Copy the rest of your project files
+COPY . .
+
+# Expose port (matches your backend PORT env variable)
 EXPOSE 3000
 
-# Start backend
-CMD ["npm", "start"]
+# Start the backend
+CMD ["node", "server.js"]
